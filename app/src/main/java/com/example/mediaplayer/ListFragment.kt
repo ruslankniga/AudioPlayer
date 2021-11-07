@@ -1,23 +1,21 @@
 package com.example.mediaplayer
 
+import android.app.Activity
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.database.Cursor
-import android.graphics.Color
 import android.graphics.PorterDuff
-import android.graphics.drawable.Drawable
+import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
 import android.os.IBinder
 import android.provider.MediaStore
 import android.view.*
 import android.widget.*
-import android.widget.MediaController.MediaPlayerControl
-import androidx.core.view.get
 import androidx.fragment.app.Fragment
-import androidx.navigation.fragment.findNavController
 import com.karumi.dexter.Dexter
 import com.karumi.dexter.PermissionToken
 import com.karumi.dexter.listener.PermissionDeniedResponse
@@ -28,10 +26,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import org.w3c.dom.Text
-import java.io.Serializable
+import java.io.File
 import java.lang.Thread.sleep
-import java.util.*
-import kotlin.collections.ArrayList
 
 
 class ListFragment : Fragment() {
@@ -83,12 +79,12 @@ class ListFragment : Fragment() {
         }
         btnPlay = view.findViewById(R.id.btnPlay)
         btnPlay?.setOnClickListener {
-            if(!playbackPaused && currentPosition != null){
+            if(!playbackPaused && musicSrv!!.checkPlayer()){
                 musicSrv?.pausePlayer()
                 playbackPaused = true
                 btnPlay?.setBackgroundResource(R.drawable.pause)
             }
-            else if(currentPosition != null){
+            else if(musicSrv!!.checkPlayer()){
                 musicSrv?.go()
                 playbackPaused = false
                 btnPlay?.setBackgroundResource(R.drawable.play)
@@ -158,9 +154,15 @@ class ListFragment : Fragment() {
             //add songs to list
             do {
                 val thisId = musicCursor.getLong(idColumn)
-                val thisTitle = musicCursor.getString(titleColumn)
-                val thisArtist = musicCursor.getString(artistColumn)
-                songList!!.add(Song(thisId, thisTitle, thisArtist))
+                var thisTitle = musicCursor.getString(titleColumn)
+                var thisArtist = musicCursor.getString(artistColumn)
+                if (thisArtist == null){
+                    thisArtist = "<unknown artist>"
+                }
+                if (thisTitle == null){
+                    thisTitle = "<unknown title>"
+                }
+                songList?.add(Song(thisId, thisTitle, thisArtist))
             } while (musicCursor.moveToNext())
         }
     }
@@ -200,6 +202,10 @@ class ListFragment : Fragment() {
                 musicSrv = null
                 System.exit(0)
             }
+
+            R.id.action_load -> {
+                openFileChoosen()
+            }
         }
         return super.onOptionsItemSelected(item)
     }
@@ -211,12 +217,12 @@ class ListFragment : Fragment() {
         super.onDestroy()
     }
 
-    fun setTextStart(currentPosition : Int){
+    fun setTextStart(currentPosition: Int){
         GlobalScope.launch(Dispatchers.Main) {
             textStart?.text =createTime(currentPosition)
         }
     }
-    fun setTextEnd(totalDuration : Int){
+    fun setTextEnd(totalDuration: Int){
         GlobalScope.launch(Dispatchers.Main) {
             textEnd?.text =createTime(totalDuration)
         }
@@ -248,7 +254,7 @@ class ListFragment : Fragment() {
         updateSeekBar?.start()
         seekBar?.progressDrawable?.setColorFilter(resources.getColor(R.color.purple_700), PorterDuff.Mode.MULTIPLY)
         seekBar?.thumb?.setColorFilter(resources.getColor(R.color.purple_700), PorterDuff.Mode.SRC_IN)
-        seekBar?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener{
+        seekBar?.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
             }
 
@@ -278,12 +284,32 @@ class ListFragment : Fragment() {
         return time
     }
 
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode,resultCode,data)
+        if(resultCode == Activity.RESULT_OK){
+            val uri = data?.data
+
+            musicSrv?.playLoadSong(uri!!)
+            textSong?.text = "From Files"
+            btnPlay?.setBackgroundResource(R.drawable.play)
+            playbackPaused = false
+            setSeekBar()
+        }
+    }
+
+    fun openFileChoosen(){
+        val intent = Intent(Intent.ACTION_GET_CONTENT)
+        intent.type = "*/*"
+        startActivityForResult(intent, 1)
+    }
+
 
     //Controller
 
     override fun onPause() {
         super.onPause()
         paused = true
+        //musicSrv!!.notification("Audio Player")
     }
 
     override fun onResume() {
@@ -306,9 +332,33 @@ class ListFragment : Fragment() {
                 btnPlay?.setBackgroundResource(R.drawable.play)
             }
         }
+        else{
+            currentPosition = 0
+            if (currentPosition!! < songList!!.size-1) {
+                musicSrv!!.playNext()
+                currentPosition = currentPosition!! +1
+                if (playbackPaused) {
+                    playbackPaused = false
+                }
+                textSong?.text = songList!![currentPosition!!].title
+                btnPlay?.setBackgroundResource(R.drawable.play)
+            }
+        }
     }
     fun playPrev() {
         if(currentPosition != null) {
+            if (currentPosition!! > 0) {
+                musicSrv!!.playPrev()
+                currentPosition = currentPosition!! -1
+                if (playbackPaused) {
+                    playbackPaused = false
+                }
+                textSong?.text = songList!![currentPosition!!].title
+                btnPlay?.setBackgroundResource(R.drawable.play)
+            }
+        }
+        else{
+            currentPosition = 0
             if (currentPosition!! > 0) {
                 musicSrv!!.playPrev()
                 currentPosition = currentPosition!! -1

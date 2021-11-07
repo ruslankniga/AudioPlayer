@@ -5,8 +5,15 @@
       tools:context=".MainActivity">
 
     <item
+        android:id="@+id/action_load"
+        android:icon="@drawable/ic_baseline_cloud_download_24"
+        android:orderInCategory="2"
+        app:showAsAction="always"
+        android:title="Load"/>
+
+    <item
         android:id="@+id/action_end"
-        android:icon="@drawable/end"
+        android:icon="@drawable/ic_baseline_close_24"
         android:orderInCategory="2"
         app:showAsAction="always"
         android:title="End"/>

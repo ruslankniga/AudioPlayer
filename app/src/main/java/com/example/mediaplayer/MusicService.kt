@@ -1,6 +1,8 @@
 package com.example.mediaplayer
 
-import android.app.Notification
+import android.R
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.ContentUris
@@ -8,11 +10,13 @@ import android.content.Context
 import android.content.Intent
 import android.media.AudioManager
 import android.media.MediaPlayer
+import android.net.Uri
 import android.os.Binder
+import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
-import android.widget.TextView
+import androidx.core.app.NotificationCompat
 import java.util.*
 
 
@@ -24,7 +28,6 @@ class MusicService() : Service(), MediaPlayer.OnPreparedListener, MediaPlayer.On
     private var songPosn = 0
     private val musicBind: IBinder = MusicBinder()
     private var context : Context? = null
-    private val NOTIFY_ID = 1
 
 
     override fun onCreate(){
@@ -49,8 +52,25 @@ class MusicService() : Service(), MediaPlayer.OnPreparedListener, MediaPlayer.On
         //player?.prepareAsync()
     }
 
+    fun playLoadSong(uri: Uri){
+
+        player?.reset()
+        try {
+            player = MediaPlayer.create(context, uri)
+        }
+        catch (e: Exception){
+            Log.e("MUSIC SERVICE", "Error setting data source", e);
+        }
+
+        player?.start()
+    }
+
     fun setSong(songIndex: Int){
         songPosn = songIndex
+    }
+
+    fun checkPlayer() : Boolean{
+        return player!=null
     }
 
     fun initMusicPlayer(){
@@ -79,24 +99,27 @@ class MusicService() : Service(), MediaPlayer.OnPreparedListener, MediaPlayer.On
 
     override fun onPrepared(mp: MediaPlayer?) {
         mp!!.start()
-        val notIntent = Intent(this, MainActivity::class.java)
-        notIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        /*
-        val pendInt = PendingIntent.getActivity(this, 0,
-                notIntent, PendingIntent.FLAG_UPDATE_CURRENT)
-
-        val builder = Notification.Builder(this)
-
-        builder.setContentIntent(pendInt)
-                .setSmallIcon(R.drawable.play)
-                .setTicker(songs?.get(songPosn)!!.title)
-                .setOngoing(true)
-                //.setContentTitle(Playing)
-                .setContentText(songs?.get(songPosn)!!.title)
-
-
-        startForeground(NOTIFY_ID, builder.build())*/
     }
+
+    fun notification(str : String) {
+        val intent = Intent(context!!.applicationContext, MainActivity::class.java)
+        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        val pendingIntent = PendingIntent.getActivity(context!!.applicationContext, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
+        val notificationManager = context!!.applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notBuilder = NotificationCompat.Builder(context!!.applicationContext, "CHANNEL_ID")
+                .setAutoCancel(false)
+                .setSmallIcon(R.mipmap.sym_def_app_icon)
+                .setWhen(System.currentTimeMillis())
+                .setContentIntent(pendingIntent)
+                .setContentTitle(str)
+
+        val notificationChannel = NotificationChannel("CHANNEL_ID", "CHANNEL_ID", NotificationManager.IMPORTANCE_DEFAULT)
+        notificationManager.createNotificationChannel(notificationChannel)
+
+        notificationManager.notify(1, notBuilder.build())
+    }
+
 
     override fun onError(mp: MediaPlayer?, what: Int, extra: Int): Boolean {
         mp!!.reset()
