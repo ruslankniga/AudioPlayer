@@ -24,6 +24,9 @@
         </activity>
 
         <service android:name=".MusicService" />
+        <receiver android:name=".Notification.NotificationActionService"/>
+        <service android:name=".Notification.OnClearFromRecentService"/>
+
     </application>
 
 </manifest>

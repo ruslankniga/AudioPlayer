@@ -1,10 +1,7 @@
 package com.example.mediaplayer
 
 import android.app.Activity
-import android.content.ComponentName
-import android.content.Context
-import android.content.Intent
-import android.content.ServiceConnection
+import android.content.*
 import android.database.Cursor
 import android.graphics.PorterDuff
 import android.media.MediaPlayer
@@ -16,6 +13,8 @@ import android.provider.MediaStore
 import android.view.*
 import android.widget.*
 import androidx.fragment.app.Fragment
+import com.example.mediaplayer.Notification.CreateNotification
+import com.example.mediaplayer.Notification.OnClearFromRecentService
 import com.karumi.dexter.Dexter
 import com.karumi.dexter.PermissionToken
 import com.karumi.dexter.listener.PermissionDeniedResponse
@@ -60,6 +59,9 @@ class ListFragment : Fragment() {
         songList = ArrayList<Song>()
 
         runtimePermission()
+
+        requireContext().registerReceiver(broadcastReceiver, IntentFilter("TRACKS_TRACKS"))
+        requireContext().startService(Intent(requireActivity().baseContext, OnClearFromRecentService::class.java))
     }
 
 
@@ -214,6 +216,7 @@ class ListFragment : Fragment() {
         context?.stopService(playIntent)
         musicSrv?.onUnbind(playIntent)
         musicSrv = null
+        requireContext().unregisterReceiver(broadcastReceiver)
         super.onDestroy()
     }
 
@@ -309,7 +312,6 @@ class ListFragment : Fragment() {
     override fun onPause() {
         super.onPause()
         paused = true
-        //musicSrv!!.notification("Audio Player")
     }
 
     override fun onResume() {
@@ -368,6 +370,37 @@ class ListFragment : Fragment() {
                 textSong?.text = songList!![currentPosition!!].title
                 btnPlay?.setBackgroundResource(R.drawable.play)
             }
+        }
+    }
+
+    //Notification
+    var broadcastReceiver : BroadcastReceiver = object : BroadcastReceiver(){
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val action = intent!!.extras!!.getString("actionname")
+            val createNotification = CreateNotification()
+            when(action){
+                createNotification.ACTION_PREV ->{
+                    playPrev()
+                    setSeekBar()
+                }
+                createNotification.ACTION_NEXT ->{
+                    playNext()
+                    setSeekBar()
+                }
+                createNotification.ACTION_PLAY ->{
+                    if(!playbackPaused && musicSrv!!.checkPlayer()){
+                        musicSrv?.pausePlayer()
+                        playbackPaused = true
+                        btnPlay?.setBackgroundResource(R.drawable.pause)
+                    }
+                    else if(musicSrv!!.checkPlayer()){
+                        musicSrv?.go()
+                        playbackPaused = false
+                        btnPlay?.setBackgroundResource(R.drawable.play)
+                    }
+                }
+            }
+
         }
     }
 }

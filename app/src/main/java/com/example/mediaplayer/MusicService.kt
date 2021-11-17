@@ -1,10 +1,9 @@
 package com.example.mediaplayer
 
-import android.R
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
@@ -12,11 +11,10 @@ import android.media.AudioManager
 import android.media.MediaPlayer
 import android.net.Uri
 import android.os.Binder
-import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
-import androidx.core.app.NotificationCompat
+import com.example.mediaplayer.Notification.CreateNotification
 import java.util.*
 
 
@@ -28,6 +26,9 @@ class MusicService() : Service(), MediaPlayer.OnPreparedListener, MediaPlayer.On
     private var songPosn = 0
     private val musicBind: IBinder = MusicBinder()
     private var context : Context? = null
+    private var createNotification = CreateNotification()
+    private var notificationManager: NotificationManager? = null
+    private var playSong: Song? = null
 
 
     override fun onCreate(){
@@ -39,8 +40,8 @@ class MusicService() : Service(), MediaPlayer.OnPreparedListener, MediaPlayer.On
     fun playSong(){
         player?.reset()
 
-        val playSong = songs!!.get(songPosn)
-        val currSong = playSong.id
+        playSong = songs!!.get(songPosn)
+        val currSong = playSong!!.id
         val trackUri = ContentUris.withAppendedId(android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, currSong)
         try {
             player = MediaPlayer.create(context, trackUri)
@@ -49,7 +50,19 @@ class MusicService() : Service(), MediaPlayer.OnPreparedListener, MediaPlayer.On
             Log.e("MUSIC SERVICE", "Error setting data source", e);
         }
         player?.start()
+
+        createChanel()
+        createNotification.createNotification(context!!.applicationContext, playSong!!, R.drawable.ic_baseline_pause_24, songPosn, songs!!.size)
+
         //player?.prepareAsync()
+    }
+
+    fun createChanel(){
+        val chanel = NotificationChannel(createNotification.CHANNEL_ID,
+                "Kod dev", NotificationManager.IMPORTANCE_LOW)
+
+        notificationManager = context!!.applicationContext.getSystemService(NotificationManager::class.java)
+        notificationManager?.createNotificationChannel(chanel)
     }
 
     fun playLoadSong(uri: Uri){
@@ -101,25 +114,6 @@ class MusicService() : Service(), MediaPlayer.OnPreparedListener, MediaPlayer.On
         mp!!.start()
     }
 
-    fun notification(str : String) {
-        val intent = Intent(context!!.applicationContext, MainActivity::class.java)
-        intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TASK)
-        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-        val pendingIntent = PendingIntent.getActivity(context!!.applicationContext, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT)
-        val notificationManager = context!!.applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val notBuilder = NotificationCompat.Builder(context!!.applicationContext, "CHANNEL_ID")
-                .setAutoCancel(false)
-                .setSmallIcon(R.mipmap.sym_def_app_icon)
-                .setWhen(System.currentTimeMillis())
-                .setContentIntent(pendingIntent)
-                .setContentTitle(str)
-
-        val notificationChannel = NotificationChannel("CHANNEL_ID", "CHANNEL_ID", NotificationManager.IMPORTANCE_DEFAULT)
-        notificationManager.createNotificationChannel(notificationChannel)
-
-        notificationManager.notify(1, notBuilder.build())
-    }
-
 
     override fun onError(mp: MediaPlayer?, what: Int, extra: Int): Boolean {
         mp!!.reset()
@@ -147,6 +141,7 @@ class MusicService() : Service(), MediaPlayer.OnPreparedListener, MediaPlayer.On
 
     fun pausePlayer() {
         player!!.pause()
+        createNotification.createNotification(context!!.applicationContext, playSong!!, R.drawable.ic_baseline_play_arrow_24, songPosn, songs!!.size)
     }
 
     fun seek(posn: Int) {
@@ -155,6 +150,7 @@ class MusicService() : Service(), MediaPlayer.OnPreparedListener, MediaPlayer.On
 
     fun go() {
         player!!.start()
+        createNotification.createNotification(context!!.applicationContext, playSong!!, R.drawable.ic_baseline_pause_24, songPosn, songs!!.size)
     }
 
     fun playPrev(){
@@ -172,6 +168,7 @@ class MusicService() : Service(), MediaPlayer.OnPreparedListener, MediaPlayer.On
     }
 
     override fun onDestroy() {
+        notificationManager?.cancelAll()
         stopForeground(true)
     }
 
